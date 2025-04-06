@@ -2,6 +2,7 @@ import pygame
 import random
 import heapq
 from enum import Enum
+from concurrent.futures import ThreadPoolExecutor
 
 # Константы
 CELL_SIZE = 8
@@ -34,8 +35,8 @@ class MazeGenerator:
         self.grid = [[1 for _ in range(width)] for _ in range(height)]
         self.directions = [(-2, 0), (2, 0), (0, -2), (0, 2)]
     
-    def generate(self, animate=False):
-        """Генерирует лабиринт с возможностью анимации процесса."""
+    def generate(self):
+        """Генерирует лабиринт без анимации."""
         start = (1, 1)
         self.grid[start[1]][start[0]] = 0
         stack = [start]
@@ -44,22 +45,19 @@ class MazeGenerator:
             x, y = stack[-1]
             random.shuffle(self.directions)
             carved = False
-            
+
+            # Обработка направлений без анимации
             for dx, dy in self.directions:
                 nx, ny = x + dx, y + dy
                 if 1 <= nx < self.width-1 and 1 <= ny < self.height-1:
                     if self.grid[ny][nx] == 1:
                         self.grid[ny][nx] = 0
-                        self.grid[y + dy//2][x + dx//2] = 0
+                        self.grid[y + (ny - y) // 2][x + (nx - x) // 2] = 0
                         stack.append((nx, ny))
                         carved = True
-                        if animate:
-                            yield (nx, ny)  # Для анимации
                         break
             if not carved:
                 stack.pop()
-                if animate:
-                    yield None  # Обновление экрана
 
 class PathFinder:
     """Класс для поиска пути с использованием алгоритма A* и визуализации."""
@@ -128,7 +126,7 @@ class GameState:
         self.frontier = []
         self.generating = False
         self.solving = False
-        self.animation_speed = 0
+        self.animation_speed = 10  # Начальная скорость анимации
         
         # Для анимации
         self.gen_iterator = None
@@ -159,7 +157,7 @@ class GameState:
                 self.end = (grid_x, grid_y)
     
     def handle_key_press(self, event):
-        """Обрабатывает нажатия клавиш."""
+        """Обрабатывает нажатия клавиш.""" 
         if event.key == pygame.K_SPACE:
             self.regenerate_maze()
         elif event.key == pygame.K_RETURN and self.start and self.end:
@@ -171,8 +169,8 @@ class GameState:
         self.start = None
         self.end = None
         self.path = None
-        self.gen_iterator = self.maze.generate(animate=True)
-    
+        self.maze.generate()  # Генерация без анимации
+        
     def start_solving(self):
         """Запускает алгоритм поиска пути"""
         self.solving = True
@@ -183,11 +181,8 @@ class GameState:
     def update(self):
         """Обновляет состояние игры"""
         if self.generating:
-            try:
-                next(self.gen_iterator)
-            except StopIteration:
-                self.generating = False
-                self.grid = self.maze.grid
+            self.generating = False
+            self.grid = self.maze.grid
         
         if self.solving:
             try:
@@ -235,7 +230,7 @@ def main():
     
     running = True
     while running:
-        clock.tick(game.animation_speed)
+        clock.tick(game.animation_speed)  # Регулировка скорости анимации
         running = game.handle_events()
         game.update()
         game.draw()
