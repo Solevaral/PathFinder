@@ -5,8 +5,9 @@ from enum import Enum
 from concurrent.futures import ThreadPoolExecutor
 
 # Константы
-CELL_SIZE = 8
-GRID_WIDTH, GRID_HEIGHT = 101, 101
+CELL_SIZE = 6  # Размер клетки в пикселях
+# Размеры сетки
+GRID_WIDTH, GRID_HEIGHT = 101, 101  # Размеры сетки (нечетные числа для корректной генерации лабиринта)
 WINDOW_WIDTH = GRID_WIDTH * CELL_SIZE
 WINDOW_HEIGHT = GRID_HEIGHT * CELL_SIZE
 
@@ -95,9 +96,7 @@ class PathFinder:
                             came_from[neighbor] = current
             
             visited.add(current)
-            if visualize:
-                yield visited.copy(), frontier.copy(), None
-            
+        
         # Восстановление пути
         path = []
         current = end
@@ -126,7 +125,7 @@ class GameState:
         self.frontier = []
         self.generating = False
         self.solving = False
-        self.animation_speed = 10  # Начальная скорость анимации
+        self.animation_speed = 0  # Начальная скорость анимации
         
         # Для анимации
         self.gen_iterator = None
@@ -155,13 +154,15 @@ class GameState:
         elif event.button == 3:  # ПКМ
             if self.grid[grid_y][grid_x] == 0:
                 self.end = (grid_x, grid_y)
+        
+        # Если обе точки установлены, запускаем поиск пути
+        if self.start and self.end:
+            self.start_solving()
     
     def handle_key_press(self, event):
         """Обрабатывает нажатия клавиш.""" 
         if event.key == pygame.K_SPACE:
             self.regenerate_maze()
-        elif event.key == pygame.K_RETURN and self.start and self.end:
-            self.start_solving()
     
     def regenerate_maze(self):
         """Перегенерирует лабиринт и сбрасывает состояние"""
@@ -169,13 +170,16 @@ class GameState:
         self.start = None
         self.end = None
         self.path = None
+        self.visited = set()
+        self.frontier = []
+        self.maze = MazeGenerator(GRID_WIDTH, GRID_HEIGHT)  # Создание нового лабиринта
         self.maze.generate()  # Генерация без анимации
         
     def start_solving(self):
         """Запускает алгоритм поиска пути"""
         self.solving = True
         self.astar_iterator = PathFinder.astar(
-            self.grid, self.start, self.end, visualize=True
+            self.grid, self.start, self.end, visualize=False  # Включаем визуализацию для размышлений
         )
     
     def update(self):
@@ -189,7 +193,10 @@ class GameState:
                 self.visited, self.frontier, self.path = next(self.astar_iterator)
             except StopIteration:
                 self.solving = False
-    
+        # Подсчет свободных и занятых клеток
+        self.free_cells = sum(row.count(0) for row in self.grid)
+        self.occupied_cells = sum(row.count(1) for row in self.grid)
+
     def draw(self):
         """Отрисовывает текущее состояние"""
         screen.fill(Colors.BLACK.value)
@@ -201,12 +208,12 @@ class GameState:
                 pygame.draw.rect(screen, color, (x*CELL_SIZE, y*CELL_SIZE, CELL_SIZE, CELL_SIZE))
         
         # Отрисовка посещенных ячеек
-        for x, y in self.visited:
-            pygame.draw.rect(screen, Colors.GREY.value, (x*CELL_SIZE, y*CELL_SIZE, CELL_SIZE, CELL_SIZE))
+        #for x, y in self.visited:
+            #pygame.draw.rect(screen, Colors.GREY.value, (x*CELL_SIZE, y*CELL_SIZE, CELL_SIZE, CELL_SIZE))
         
         # Отрисовка фронтера
-        for _, (x, y) in self.frontier:
-            pygame.draw.rect(screen, Colors.PURPLE.value, (x*CELL_SIZE, y*CELL_SIZE, CELL_SIZE, CELL_SIZE))
+        #for _, (x, y) in self.frontier:
+            #pygame.draw.rect(screen, Colors.PURPLE.value, (x*CELL_SIZE, y*CELL_SIZE, CELL_SIZE, CELL_SIZE))
         
         # Отрисовка пути
         if self.path:
